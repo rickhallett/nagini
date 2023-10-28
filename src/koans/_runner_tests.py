@@ -16,7 +16,8 @@ def suite():
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestMountain))
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestSensei))
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestHelper))
-    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestFilterKoanNames))
+    suite.addTests(unittest.TestLoader(
+    ).loadTestsFromTestCase(TestFilterKoanNames))
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestKoansSuite))
     return suite
 

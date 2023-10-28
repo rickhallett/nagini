@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from runner.koan import *
-import IPython
-IPython.start_ipython(argv=[])
 #
 # Based on AboutNil in the Ruby Koans
 #
@@ -38,15 +36,15 @@ class AboutNone(Koan):
         #
         #     https://github.com/gregmalcolm/python_koans/wiki/Class-Attribute
 
-        self.assertEqual(__, ex2.__class__)
+        self.assertEqual(AttributeError, ex2.__class__)
 
         # What message was attached to the exception?
         # (HINT: replace __ with part of the error message.)
-        self.assertRegex(ex2.args[0], __)
+        self.assertRegex(ex2.args[0], 'attribute')
 
     def test_none_is_distinct(self):
         """
         None is distinct from other things which are False.
         """
-        self.assertEqual(__, None is not 0)
-        self.assertEqual(__, None is not False)
+        self.assertEqual(True, None is not 0)
+        self.assertEqual(True, None is not False)

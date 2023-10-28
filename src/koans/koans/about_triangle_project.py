@@ -6,7 +6,27 @@ from runner.koan import *
 # You need to write the triangle method in the file 'triangle.py'
 from .triangle import *
 
+
+def triangle(a: int, b: int, c: int) -> str:
+    l = len(set([a, b, c]))
+    if l == 1:
+        return 'equilateral'
+    elif l == 2:
+        return 'isosceles'
+    else:
+        return 'scalene'
+
+
+def triangle(a, b, c): return 'equilateral' if len(
+    set([a, b, c])) == 1 else 'isosceles' if len(set([a, b, c])) == 2 else 'scalene'
+
+
+def triangle(a, b, c): return {1: 'equilateral',
+                               2: 'isosceles', 3: 'scalene'}[len(set([a, b, c]))]
+
+
 class AboutTriangleProject(Koan):
+
     def test_equilateral_triangles_have_equal_sides(self):
         self.assertEqual('equilateral', triangle(2, 2, 2))
         self.assertEqual('equilateral', triangle(10, 10, 10))

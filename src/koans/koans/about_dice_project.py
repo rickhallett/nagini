@@ -5,6 +5,7 @@ from runner.koan import *
 
 import random
 
+
 class DiceSet:
     def __init__(self):
         self._values = None
@@ -14,9 +15,9 @@ class DiceSet:
         return self._values
 
     def roll(self, n):
-        # Needs implementing!
-        # Tip: random.randint(min, max) can be used to generate random numbers
-        pass
+        self._values = [random.randint(1, num) for num in range(1, n+1)]
+        return self._values
+
 
 class AboutDiceProject(Koan):
     def test_can_create_a_dice_set(self):
@@ -30,7 +31,8 @@ class AboutDiceProject(Koan):
         self.assertTrue(isinstance(dice.values, list), "should be a list")
         self.assertEqual(5, len(dice.values))
         for value in dice.values:
-            self.assertTrue(value >= 1 and value <= 6, "value " + str(value) + " must be between 1 and 6")
+            self.assertTrue(value >= 1 and value <= 6, "value " +
+                            str(value) + " must be between 1 and 6")
 
     def test_dice_values_do_not_change_unless_explicitly_rolled(self):
         dice = DiceSet()
@@ -48,14 +50,16 @@ class AboutDiceProject(Koan):
         dice.roll(5)
         second_time = dice.values
 
-        self.assertNotEqual(first_time, second_time, \
-            "Two rolls should not be equal")
+        self.assertNotEqual(first_time, second_time,
+                            "Two rolls should not be equal")
+
+        self.assertEqual(False, first_time is second_time)
 
         # THINK ABOUT IT:
         #
         # If the rolls are random, then it is possible (although not
         # likely) that two consecutive rolls are equal.  What would be a
-        # better way to test this?
+        # better way to test this? ^
 
     def test_you_can_roll_different_numbers_of_dice(self):
         dice = DiceSet()

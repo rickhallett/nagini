@@ -2,6 +2,9 @@
 # from .helpers import get_answer
 from enum import Enum
 from urllib import request
+import json
+import os
+import argparse
 import click
 
 """
@@ -102,17 +105,107 @@ operations = {
     }
 }
 
-prompts = {
-    Category.REDUCTIVE: {
-        "choice": "Please select your form of reduction",
-    },
-    Category.TRANSFORMATIONAL: {
-        "choice": "Please select your form of transformation"
-    },
-    Category.GENERATIVE: {
-        "choice": "Please select your form of generation"
-    }
+operations_map = {
+    Category.REDUCTIVE: list(map(lambda x: (x.value, operations[Category.REDUCTIVE][x]), Reductive)),
+    Category.TRANSFORMATIONAL: list(map(lambda x: (x.value, operations[Category.TRANSFORMATIONAL][x]), Transformational)),
+    Category.GENERATIVE: list(
+        map(lambda x: (x.value, operations[Category.GENERATIVE][x]), Generative))
 }
+
+
+def gen_taxonomy():
+    output = ""
+    for category, operations in operations_map.items():
+        output += (f"\nCategory: {category.value}\n")
+        for operation in operations:
+            output += (f" - {operation[0]}: {operation[1]}\n")
+    return output
+
+
+intro_prompt = f"You are a master logistician, linguist and teacher. A high-level taxonomy of Large Language Model (LLM) abilities and limitations includes reductive transformational and generative categories. Assuming each category is prefaced with 'Category:', and each subcategory is prefixed with ' - ', store the following:\n{gen_taxonomy()}\nThe prompt following this one will include a topic, category and subcategory so that you can elaborate on how to apply these to generate an enhanced prompt, based on the stored taxonomy. If the following prompt is a repeat of this prompt, ignore this prompt. If this is understood, please reply with 'understood'"
+
+
+class HagridErrorCode(Enum):
+    SUPERMIND_INTERFERENCE = "No good sitting worrying about it. What's coming will come, and we'll meet it when it does"
+    UNKNOWN_ERROR = "Yer a wizard, Harry"
+
+
+class HagridError(BaseException):
+    def __init__(self, msg, error_code=HagridErrorCode.UNKNOWN_ERROR):
+        super().__init__(msg)
+        self.error_code = error_code
+
+    def log_err(self):
+        print(f"\033[91mError!Error: {self.error_code}: {self}\033[0m")
+
+
+class FileContextManager():
+    def __init__(self, file_name):
+        self._file_name = file_name
+        self._file = None
+
+    def __enter__(self):
+        self._file = open(self._file_name)
+        return self._file
+
+    def __exit__(self, cls, value, tb):
+        self._file.close()
+
+
+class GPTRequestContextManager():
+    def __init__(self, prompt=None, ui=None) -> None:
+        self._prompt = prompt
+        self._api_key = os.getenv("OPENAI_API_KEY")
+        self._org = os.getenv("OPENAI_API_ORG")
+        self._req_url = 'https://api.openai.com/v1/chat/completions'
+        self._ui = ui
+
+    def __enter__(self):
+        data = self.gen_request_data(self._prompt)
+        headers = self.gen_headers()
+        req = request.Request(self._req_url, data=data,
+                              headers=headers, method='POST')
+
+        if self._prompt:
+            self._ui.notify(
+                f"\033[94mSending request:\033[0m {self._prompt}\n")
+        else:
+            self._ui.notify(
+                "\033[95mSending GPT configuration request:\033[0m\n")
+            self._ui.notify(intro_prompt)
+            self._ui.notify()
+
+        try:
+            with request.urlopen(req) as response:
+                if response.status == 200:
+                    result = response.read().decode()
+                else:
+                    raise HagridError(
+                        f"FUCK HTTP HARRY! Use ya wand!!", HagridErrorCode.UNKNOWN_ERROR)
+        except BaseException as ex:
+            raise HagridError(ex, HagridErrorCode.SUPERMIND_INTERFERENCE)
+        finally:
+            request.urlcleanup()
+
+        return result
+
+    def __exit__(self, cls, value, tb):
+        pass
+
+    def gen_request_data(self, prompt=intro_prompt):
+        data = {
+            "model": "gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": f"{prompt}"}],
+            "temperature": 0.7
+        }
+
+        return json.dumps(data).encode()
+
+    def gen_headers(self):
+        return {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._api_key}"
+        }
 
 
 class UserInterface():
@@ -124,8 +217,8 @@ class UserInterface():
 
     def collect_prompt(self) -> tuple[str, Category, Reductive | Transformational | Generative]:
         """Collects initial topic and prompt category from the user."""
-        # topic = click.prompt("\033[94mPlease enter the initial topic\033[0m")
-        topic = "Soon, you will become magnificent"
+        topic = click.prompt("\033[94mPlease enter the initial topic\033[0m")
+        # topic = "Soon, you will become magnificent"
         click.echo(f"Topic: {topic}")
 
         click.echo("\n\033[94mPlease select a prompt category:\033[0m")
@@ -141,7 +234,8 @@ class UserInterface():
         click.echo(
             f" - Prompt category: {operation_type.value}\n")
 
-        click.echo(f"\033[94m{prompts[operation_type]['choice']}\033[0m")
+        click.echo(
+            f"\033[94mPlease select the subcategory:\n\033[0m")
 
         self.list_options(subcategories, operation_type)
 
@@ -153,16 +247,13 @@ class UserInterface():
         click.echo(
             f" - Desc: {self.operations[operation_type][subcategory_choice]}\n")
 
-        return topic, operation_type, subcategory_choice
+        return (topic, operation_type.value, subcategory_choice.value)
 
     def list_options(self, options: list[any], operation_type=None) -> None:
         for i, opt in enumerate(options):
             click.echo(
                 f"\033[93m{i + 1}: {str(opt.name).replace('_',' ').lower().capitalize()}\033[0m{' - ' + self.operations[operation_type][opt] if operation_type else ''}")
         click.echo()
-
-    def make_readable(self, category) -> str:
-        return str(category.name).replace('_', '').lower().capitalize()
 
     def get_option(self, options: list[any]) -> int:
         """Ensures user selection is in range of options param"""
@@ -171,17 +262,52 @@ class UserInterface():
             click.echo(
                 f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options)))))}")
             option_choice = click.prompt("Your choice", type=int)
+
         return option_choice
+
+    def notify(self, msg="\n"):
+        print(msg)
 
 
 class LLMInterface():
     """Sends and receives data to/from the LLM."""
 
-    def request():
-        req = request.urlopen('https://jsonplaceholder.typicode.com/todos/1')
-        print(req)
+    def __init__(self):
+        self.is_taxonomy_loaded = False
 
-    pass
+    def load_taxonomy(self, ui):
+        try:
+            with GPTRequestContextManager(ui=ui) as result:
+                if result == "understood":
+                    self.is_taxonomy_loaded = True
+                return result
+        except HagridError as ex:
+            raise HagridError(ex)
+
+    def initial_request(self, initial_prompt, ui: UserInterface):
+        prompt = self.gen_prompt(initial_prompt)
+
+        try:
+            with GPTRequestContextManager(prompt, ui) as result:
+                return self.decode_200_res(result)
+
+        except HagridError as ex:
+            raise HagridError(ex)
+
+    def enhanced_request(self, enhanced_prompt, ui: UserInterface):
+        try:
+            with GPTRequestContextManager(prompt=enhanced_prompt, ui=ui) as result:
+                return self.decode_200_res(result)
+        except HagridError as ex:
+            raise HagridError(ex)
+
+    def gen_prompt(self, initial_prompt):
+        topic, operation_type, subcategory_choice = initial_prompt
+
+        return f"Topic: {topic}, category: {operation_type}, subcategory: {subcategory_choice}. Please take the topic and create an enhanced prompt based on the category and subcategory. Be as detailed as possible. In the response, do not include anything but the enhanced prompt."
+
+    def decode_200_res(self, res):
+        return json.JSONDecoder().decode(res)['choices'][0]['message']['content']
 
 
 class DataStorage():
@@ -192,64 +318,49 @@ class DataStorage():
 class Manager():
     """Acts as mediator between other modules"""
 
-    def __init__(self, db, llm, ui):
-        self.db = db
-        self.llm = llm
-        self.ui = ui
+    def __init__(self):
+        self.db = DataStorage()
+        self.llm = LLMInterface()
+        self.ui = UserInterface()
 
-    def start(self):
-        topic, operation_type, subcategory_choice = ui.collect_prompt()
-        print(topic, operation_type, subcategory_choice)
+    def get_deps(self):
+        return self.db, self.llm, self.ui
 
+    def init_gpt(self):
+        try:
+            return self.llm.load_taxonomy(self.ui)
+        except HagridError as ex:
+            raise ex
 
-@click.command()
-def init_prompt():
-    ui.collect_prompt()
+    def get_initial_prompt(self):
+        return self.ui.collect_prompt()
+
+    def make_initial_request(self, initial_prompt):
+        return self.llm.initial_request(initial_prompt, self.ui)
+
+    def make_enhanced_request(self, enhanced_prompt):
+        return self.llm.enhanced_request(enhanced_prompt, self.ui)
 
 
 if __name__ == '__main__':
-    db = DataStorage()
-    llm = LLMInterface()
-    ui = UserInterface()
-    app = Manager(db, llm, ui)
-    app.start()
 
-"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--skip", action="store_true")
+    args = parser.parse_args()
 
-The Mediator pattern defines an object that encapsulates how a set of objects interact. It promotes loose 
-coupling by keeping objects from referring to each other explicitly, and it allows their interaction to vary 
-independently.
+    app = Manager()
+    db, llm, ui = app.get_deps()
+    try:
+        # app.start()
+        if args.skip == False:
+            res = app.init_gpt()
+            if res:
+                print("\033[95mPrompt taxonomy system loaded into GPT\033[0m\n")
 
-Advantages of the Mediator (Manager) pattern:
-
-1. Reduced Coupling: The pattern limits direct communication between the objects (UserInterface, DataStorage, 
-LLMInterface) which reduces the dependencies between them, leading to lower coupling.
-
-2. Increased Flexibility: Changes to the system can be made more easily because interactions between objects 
-are centralized in one location.
-
-3. Simplifies Maintenance and Understanding: It's easier to understand and maintain the interaction logic 
-that is concentrated in one place rather than spread across individual classes.
-
-Disadvantages of the Mediator (Manager) pattern:
-
-1. Can Become Overly Complex: If the mediator becomes too complex, it can become a monolith or god object, 
-which is an object that knows too much or does too much. This can make the mediator itself hard to maintain.
-
-2. Indirect Communication: The pattern can decrease the performance of the system as all communication is 
-done indirectly, through the mediator.
-
-Alternative patterns:
-
-1. Facade Pattern: This pattern provides a simplified interface to a larger body of code. It can make a 
-software library easier to use and understand, since the facade has convenient methods for common tasks.
-
-2. Observer Pattern: This pattern is used when there is one-to-many relationship between objects such as 
-if one object is modified, its dependent objects are to be notified automatically.
-
-3. Command Pattern: This pattern allows you to encapsulate actions in objects. The key idea is to provide 
-means to decouple client from receiver.
-
-Choosing the right pattern depends on the specific needs and complexity of your software.
-
-"""
+        initial_prompt = app.get_initial_prompt()
+        enhanced_prompt = app.make_initial_request(initial_prompt)
+        enhanced_res = app.make_enhanced_request(enhanced_prompt)
+        print('\033[94mResponse:\033[0m', enhanced_res)
+        # llm.initial_request()
+    except HagridError as ex:
+        print(f"\033[91mError! {ex}\033[0m")

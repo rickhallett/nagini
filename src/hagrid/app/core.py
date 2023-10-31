@@ -1,13 +1,6 @@
-# -*- coding: utf-8 -*-
-# from .helpers import get_answer
-from enum import Enum
-from urllib import request
-import json
-import os
-import argparse
-import click
+"""This is Hagrid. Hagrid likes to help Harry become a wizard, by developing
+his questions. Regard:
 
-"""
 # Data and Process Flow Diagram Description
 
 ### Simplified Components
@@ -38,7 +31,19 @@ import click
 6. **Iterative Refinement**: Use UI to allow the user to select another prompt engineering technique.
 7. **Repeat Steps 3-6**: Until the user is satisfied.
 8. **Store History**: Use DS to store all prompts and responses for future use.
+
 """
+
+# -*- coding: utf-8 -*-
+# from .helpers import get_answer
+from enum import Enum
+from urllib import request
+import json
+import os
+import argparse
+import sqlite3
+import ipdb
+from ipdb import iex
 
 
 class Category(Enum):
@@ -128,6 +133,7 @@ intro_prompt = f"You are a master logistician, linguist and teacher. A high-leve
 class HagridErrorCode(Enum):
     SUPERMIND_INTERFERENCE = "No good sitting worrying about it. What's coming will come, and we'll meet it when it does"
     UNKNOWN_ERROR = "Yer a wizard, Harry"
+    INPUT_ERROR = "Got me the gamekeeper job...trusts people, he does. Gives 'em second chances...tha's what set him apar' from other Heads, see."
 
 
 class HagridError(BaseException):
@@ -156,7 +162,13 @@ class GPTRequestContextManager():
     def __init__(self, prompt=None, ui=None) -> None:
         self._prompt = prompt
         self._api_key = os.getenv("OPENAI_API_KEY")
+        if self._api_key == None:
+            raise HagridError(
+                'No OPENAI_API_KEY env variable found', HagridErrorCode.INPUT_ERROR)
         self._org = os.getenv("OPENAI_API_ORG")
+        if self._org == None:
+            raise HagridError(
+                'No OPENAI_API_ORG env variable found', HagridErrorCode.INPUT_ERROR)
         self._req_url = 'https://api.openai.com/v1/chat/completions'
         self._ui = ui
 
@@ -217,11 +229,11 @@ class UserInterface():
 
     def collect_prompt(self) -> tuple[str, Category, Reductive | Transformational | Generative]:
         """Collects initial topic and prompt category from the user."""
-        topic = click.prompt("\033[94mPlease enter the initial topic\033[0m")
+        topic = input("\033[94mPlease enter the initial topic: \033[0m")
         # topic = "Soon, you will become magnificent"
-        click.echo(f"Topic: {topic}")
+        print(f"Topic: {topic}")
 
-        click.echo("\n\033[94mPlease select a prompt category:\033[0m")
+        print("\n\033[94mPlease select a prompt category:\033[0m")
 
         self.list_options(self.categories)
 
@@ -231,10 +243,10 @@ class UserInterface():
         operation_type = self.categories[category_choice - 1]
         subcategories = self.operations[operation_type]
 
-        click.echo(
+        print(
             f" - Prompt category: {operation_type.value}\n")
 
-        click.echo(
+        print(
             f"\033[94mPlease select the subcategory:\n\033[0m")
 
         self.list_options(subcategories, operation_type)
@@ -242,26 +254,39 @@ class UserInterface():
         subcategory_choice = list(subcategories)[
             self.get_option(subcategories) - 1]
 
-        click.echo(
+        print(
             f" - Prompt subcategory: {subcategory_choice.value}")
-        click.echo(
+        print(
             f" - Desc: {self.operations[operation_type][subcategory_choice]}\n")
 
         return (topic, operation_type.value, subcategory_choice.value)
 
     def list_options(self, options: list[any], operation_type=None) -> None:
         for i, opt in enumerate(options):
-            click.echo(
+            print(
                 f"\033[93m{i + 1}: {str(opt.name).replace('_',' ').lower().capitalize()}\033[0m{' - ' + self.operations[operation_type][opt] if operation_type else ''}")
-        click.echo()
+        print()
 
     def get_option(self, options: list[any]) -> int:
         """Ensures user selection is in range of options param"""
-        option_choice = click.prompt("Your choice", type=int)
-        while option_choice not in range(1, len(options) + 1):
-            click.echo(
-                f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options)))))}")
-            option_choice = click.prompt("Your choice", type=int)
+        option_choice = input("Your choice: ")
+        choice_number = None
+
+        try:
+            choice_number = int(option_choice)
+        except ValueError:
+            print("Invalid choice. Please choose a valid integer")
+            self.get_option(options)
+
+        if choice_number not in range(1, len(options) + 1):
+            print(
+                f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options) + 1))))}")
+            self.get_option(options)
+
+        # while option_choice not in range(1, len(options) + 1):
+        #     print(
+        #         f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options) + 1))))}")
+        #     option_choice = input("Your choice: ")
 
         return option_choice
 
@@ -290,7 +315,6 @@ class LLMInterface():
         try:
             with GPTRequestContextManager(prompt, ui) as result:
                 return self.decode_200_res(result)
-
         except HagridError as ex:
             raise HagridError(ex)
 
@@ -312,7 +336,15 @@ class LLMInterface():
 
 class DataStorage():
     """Stores all prompts and responses for future use."""
-    pass
+
+    def __init__(self):
+        self._con = sqlite3.connect('hagrid.db')
+        self._cur = self._con.cursor()
+        res = self._cur.execute(
+            'SELECT name FROM sqlite_master WHERE name="main"')
+        if res != None:
+            self._cur.execute(
+                'CREATE TABLE prompts(topic, operation, category, prompt, enhanced_prompt, response)')
 
 
 class Manager():
@@ -342,11 +374,32 @@ class Manager():
         return self.llm.enhanced_request(enhanced_prompt, self.ui)
 
 
-if __name__ == '__main__':
+class Frobnosticator():
+    """
+    Usage: frob, twiddle, and tweak sometimes connote points along a continuum. ‘Frob’ connotes aimless 
+    manipulation; twiddle connotes gross manipulation, often a coarse search for a proper setting; tweak 
+    connotes fine-tuning. If someone is turning a knob on an oscilloscope, then if he's carefully adjusting 
+    it, he is probably tweaking it; if he is just turning it but looking at the screen, he is probably 
+    twiddling it; but if he's just doing it because turning a knob is fun, he's frobbing it. The variant 
+    frobnosticate has been recently reported.
+    """
+    pass
 
+
+def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip", action="store_true")
-    args = parser.parse_args()
+    parser.add_argument("--debug", action="store_true")
+    return parser.parse_args()
+
+
+@iex
+def main():
+
+    args = get_args()
+
+    if args.debug == True:
+        ipdb.set_trace(context=5)
 
     app = Manager()
     db, llm, ui = app.get_deps()
@@ -364,3 +417,7 @@ if __name__ == '__main__':
         # llm.initial_request()
     except HagridError as ex:
         print(f"\033[91mError! {ex}\033[0m")
+
+
+if __name__ == '__main__':
+    main()

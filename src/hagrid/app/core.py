@@ -83,6 +83,18 @@ class Generative(Enum):
     IDEA_BRAINSTORMING = "Idea Brainstorming"
 
 
+def catch_errors(func):
+    """Wrapper decorator to catch and print errors"""
+    def wrapper(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except BaseException as ex:
+            # TODO: integrate with error system
+            print("Caught error via decorator!", ex)
+            logger.error(ex)
+    return wrapper
+
+
 operations = {
     Category.REDUCTIVE: {
         Reductive.SUMMARIZATION: "Condenses long content into shorter form.",
@@ -259,7 +271,7 @@ class UserInterface():
         print(
             f" - Desc: {self.operations[operation_type][subcategory_choice]}\n")
 
-        return (topic, operation_type.value, subcategory_choice.value)
+        return topic, operation_type.value, subcategory_choice.value
 
     def list_options(self, options: list[any], operation_type=None) -> None:
         for i, opt in enumerate(options):
@@ -270,20 +282,20 @@ class UserInterface():
     def get_option(self, options: list[any]) -> int:
         """Ensures user selection is in range of options param"""
         option_choice = input("Your choice: ")
-        choice_number = None
+        choice_number = None  # TODO: this var name is awful.
 
         try:
             choice_number = int(option_choice)
         except ValueError:
             print("Invalid choice. Please choose a valid integer")
-            self.get_option(options)
+            return self.get_option(options)
 
         if choice_number not in range(1, len(options) + 1):
             print(
                 f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options) + 1))))}")
-            self.get_option(options)
+            return self.get_option(options)
 
-        return option_choice
+        return choice_number
 
     def notify(self, msg="\n"):
         print(msg)
@@ -294,10 +306,12 @@ class LLMInterface():
 
     def __init__(self):
         self.is_taxonomy_loaded = False
+        with FileContextManager('reduce_list_prompt.txt') as file:
+            self.reduce_list_prompt = ''.join(file.readlines())
 
     def load_taxonomy(self, ui):
         try:
-            with GPTRequestContextManager(ui=ui) as result:
+            with GPTRequestContextManager(ui=ui, prompt=self.reduce_list_prompt) as result:
                 if result == "understood":
                     self.is_taxonomy_loaded = True
                 return result
@@ -338,13 +352,19 @@ class DataStorage():
 
         if not self.table_exists('prompts'):
             self._cur.execute(
-                'CREATE TABLE prompts(topic, operation, category, prompt, enhanced_prompt, response)')
+                'CREATE TABLE prompts(topic TEXT, operation_type TEXT, subcategory_choice TEXT, enhanced_prompt TEXT, enhanced_res TEXT)')
 
     def table_exists(self, table_name):
         self._cur.execute(
             f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
         result = self._cur.fetchone()
         return bool(result)
+
+    @catch_errors
+    def store_prompt(self, data):
+        self._cur.execute(
+            "INSERT INTO prompts (topic, operation_type, subcategory_choice, enhanced_prompt, enhanced_res) VALUES (?, ?, ?, ?, ?)", data)
+        self._con.commit()
 
 
 class Manager():
@@ -372,6 +392,9 @@ class Manager():
 
     def make_enhanced_request(self, enhanced_prompt):
         return self.llm.enhanced_request(enhanced_prompt, self.ui)
+
+    def store_prompt(self, data):
+        return self.db.store_prompt(data)
 
 
 class Frobnosticator():
@@ -436,7 +459,6 @@ def main(args, logger):
     app = Manager()
     db, llm, ui = app.get_deps()
     try:
-        # app.start()
         if args.skip == False:
             res = app.init_gpt()
             if res:
@@ -444,11 +466,13 @@ def main(args, logger):
                 logger.info(s)
                 print(f"\033[95m{s}\033[0m\n")
 
-        initial_prompt = app.get_initial_prompt()
-        enhanced_prompt = app.make_initial_request(initial_prompt)
+        topic, operation_type, subcategory_choice = app.get_initial_prompt()
+        enhanced_prompt = app.make_initial_request(
+            (topic, operation_type, subcategory_choice))
         enhanced_res = app.make_enhanced_request(enhanced_prompt)
+        app.store_prompt(
+            (topic, operation_type, subcategory_choice, enhanced_prompt, enhanced_res))
         print('\033[94mResponse:\033[0m', enhanced_res)
-        # llm.initial_request()
     except HagridError as ex:
         print(f"\033[91mError! {ex}\033[0m")
         logger.exception(ex)
@@ -456,8 +480,24 @@ def main(args, logger):
 
 
 class TestUIInterface(unittest.TestCase):
+    def setUp(self) -> None:
+        return super().setUp()
+
+    def tearDown(self) -> None:
+        return super().tearDown()
+
     def test_hello_world(self):
         self.assertEqual(1, 1)
+
+    @unittest.skip('demo skip')
+    def test_nothing(self):
+        self.fail('will not happen')
+
+
+@unittest.skip('skipping test classes')
+class TestDataStorage(unittest.TestCase):
+    def test_nope(self):
+        pass
 
 
 def create_test_suite():

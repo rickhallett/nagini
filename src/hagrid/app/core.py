@@ -34,19 +34,18 @@ his questions. Regard:
 
 """
 
-# -*- coding: utf-8 -*-
-# from .helpers import get_answer
 from enum import Enum
 from urllib import request
-import json
 import os
+import sys
 import time
 import argparse
 import sqlite3
+import json
 import logging
+import unittest
 import pdb
 import ipdb
-from ipdb import iex
 
 
 class Category(Enum):
@@ -336,11 +335,16 @@ class DataStorage():
     def __init__(self):
         self._con = sqlite3.connect('hagrid.db')
         self._cur = self._con.cursor()
-        res = self._cur.execute(
-            'SELECT name FROM sqlite_master WHERE name="main"')
-        if res != None:
+
+        if not self.table_exists('prompts'):
             self._cur.execute(
                 'CREATE TABLE prompts(topic, operation, category, prompt, enhanced_prompt, response)')
+
+    def table_exists(self, table_name):
+        self._cur.execute(
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+        result = self._cur.fetchone()
+        return bool(result)
 
 
 class Manager():
@@ -386,39 +390,14 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--no_logs", action="store_true")
+    parser.add_argument("--run-tests", action="store_true")
     return parser.parse_args()
 
 
-# @iex
-def main():
-    logger.info("app initialised")
-    args = get_args()
-
-    if args.debug == True:
-        ipdb.set_trace(context=5)
-
-    app = Manager()
-    db, llm, ui = app.get_deps()
-    try:
-        # app.start()
-        if args.skip == False:
-            res = app.init_gpt()
-            if res:
-                s = 'Prompt taxonomy system loaded into GPT'
-                logging.info(s)
-                print(f"\033[95m{s}\033[0m\n")
-
-        initial_prompt = app.get_initial_prompt()
-        enhanced_prompt = app.make_initial_request(initial_prompt)
-        enhanced_res = app.make_enhanced_request(enhanced_prompt)
-        print('\033[94mResponse:\033[0m', enhanced_res)
-        # llm.initial_request()
-    except HagridError as ex:
-        print(f"\033[91mError! {ex}\033[0m")
-        logging.exception(ex)
-
-
-if __name__ == '__main__':
+def config_logger(args):
+    if args.no_logs == True:
+        return logging.getLogger('ye_be_firin_blanks_boyo')
     # Create a logger
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)  # Set level of logger
@@ -445,4 +424,56 @@ if __name__ == '__main__':
     logger.addHandler(error_handler)
     logger.addHandler(info_handler)
 
-    main()
+    return logger
+
+
+def main(args, logger):
+    logger.info("app initialised")
+
+    if args.debug == True:
+        ipdb.set_trace(context=5)
+
+    app = Manager()
+    db, llm, ui = app.get_deps()
+    try:
+        # app.start()
+        if args.skip == False:
+            res = app.init_gpt()
+            if res:
+                s = 'Prompt taxonomy system loaded into GPT'
+                logger.info(s)
+                print(f"\033[95m{s}\033[0m\n")
+
+        initial_prompt = app.get_initial_prompt()
+        enhanced_prompt = app.make_initial_request(initial_prompt)
+        enhanced_res = app.make_enhanced_request(enhanced_prompt)
+        print('\033[94mResponse:\033[0m', enhanced_res)
+        # llm.initial_request()
+    except HagridError as ex:
+        print(f"\033[91mError! {ex}\033[0m")
+        logger.exception(ex)
+        pdb.post_mortem()
+
+
+class TestUIInterface(unittest.TestCase):
+    def test_hello_world(self):
+        self.assertEqual(1, 1)
+
+
+def create_test_suite():
+    suite = unittest.TestSuite()
+    suite.addTest(TestUIInterface('test_hello_world'))
+    return suite
+
+
+if __name__ == '__main__':
+    args = get_args()
+    logger = config_logger(args)
+
+    if args.run_tests:
+        runner = unittest.TextTestRunner(
+            stream=sys.stdout, descriptions=True, verbosity=2)
+        runner.run(create_test_suite())
+        sys.exit()
+
+    main(args, logger)

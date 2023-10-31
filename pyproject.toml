@@ -11,6 +11,8 @@ jupyterlab = "*"
 typer = "*"
 ipython = "^8.16.1"
 django = "^4.2.6"
+click = "^8.1.7"
+ipdb = "^0.13.13"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"

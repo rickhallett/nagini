@@ -40,8 +40,11 @@ from enum import Enum
 from urllib import request
 import json
 import os
+import time
 import argparse
 import sqlite3
+import logging
+import pdb
 import ipdb
 from ipdb import iex
 
@@ -230,7 +233,6 @@ class UserInterface():
     def collect_prompt(self) -> tuple[str, Category, Reductive | Transformational | Generative]:
         """Collects initial topic and prompt category from the user."""
         topic = input("\033[94mPlease enter the initial topic: \033[0m")
-        # topic = "Soon, you will become magnificent"
         print(f"Topic: {topic}")
 
         print("\n\033[94mPlease select a prompt category:\033[0m")
@@ -238,7 +240,6 @@ class UserInterface():
         self.list_options(self.categories)
 
         category_choice = self.get_option(self.categories)
-        # category_choice = 1
 
         operation_type = self.categories[category_choice - 1]
         subcategories = self.operations[operation_type]
@@ -282,11 +283,6 @@ class UserInterface():
             print(
                 f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options) + 1))))}")
             self.get_option(options)
-
-        # while option_choice not in range(1, len(options) + 1):
-        #     print(
-        #         f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options) + 1))))}")
-        #     option_choice = input("Your choice: ")
 
         return option_choice
 
@@ -393,9 +389,9 @@ def get_args():
     return parser.parse_args()
 
 
-@iex
+# @iex
 def main():
-
+    logger.info("app initialised")
     args = get_args()
 
     if args.debug == True:
@@ -408,7 +404,9 @@ def main():
         if args.skip == False:
             res = app.init_gpt()
             if res:
-                print("\033[95mPrompt taxonomy system loaded into GPT\033[0m\n")
+                s = 'Prompt taxonomy system loaded into GPT'
+                logging.info(s)
+                print(f"\033[95m{s}\033[0m\n")
 
         initial_prompt = app.get_initial_prompt()
         enhanced_prompt = app.make_initial_request(initial_prompt)
@@ -417,7 +415,34 @@ def main():
         # llm.initial_request()
     except HagridError as ex:
         print(f"\033[91mError! {ex}\033[0m")
+        logging.exception(ex)
 
 
 if __name__ == '__main__':
+    # Create a logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)  # Set level of logger
+
+    # Create handlers
+    debug_handler = logging.FileHandler('debug.log')
+    debug_handler.setLevel(logging.DEBUG)
+
+    error_handler = logging.FileHandler('error.log')
+    error_handler.setLevel(logging.ERROR)
+
+    info_handler = logging.FileHandler('info.log')
+    info_handler.setLevel(logging.INFO)
+
+    # Create formatters and add it to handlers
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    debug_handler.setFormatter(formatter)
+    error_handler.setFormatter(formatter)
+    info_handler.setFormatter(formatter)
+
+    # Add handlers to the logger
+    logger.addHandler(debug_handler)
+    logger.addHandler(error_handler)
+    logger.addHandler(info_handler)
+
     main()

@@ -38,7 +38,6 @@ from enum import Enum
 from urllib import request
 import os
 import sys
-import time
 import argparse
 import sqlite3
 import json
@@ -46,41 +45,6 @@ import logging
 import unittest
 import pdb
 import ipdb
-
-
-class Category(Enum):
-    REDUCTIVE = "Reductive Operations"
-    TRANSFORMATIONAL = "Transformational Operations"
-    GENERATIVE = "Generative Operations"
-
-
-class Reductive(Enum):
-    SUMMARIZATION = "Summarization"
-    DISTILLATION = "Distillation"
-    EXTRACTION = "Extraction"
-    CHARACTERIZING = "Characterizing"
-
-
-class Transformational(Enum):
-    REFORMATTING = "Reformatting"
-    REFACTORING = "Refactoring"
-    LANGUAGE_CHANGE = "Language Change"
-    RESTRUCTURING = "Restructuring"
-    MODIFICATION = "Modification"
-    CLARIFICATION = "Clarification"
-
-
-class Generative(Enum):
-    CONTENT_GENERATION = "Content Generation"
-    QUESTION_GENERATION = "Question Generation"
-    CODE_GENERATION = "Code Generation"
-    DIALOGUE_CREATION = "Dialogue Creation"
-    SCENARIO_BUILDING = "Scenario Building"
-    DATA_SIMULATION = "Data Simulation"
-    CREATIVE_WRITING = "Creative Writing"
-    INSTRUCTION_GENERATION = "Instruction Generation"
-    PREDICTION = "Prediction"
-    IDEA_BRAINSTORMING = "Idea Brainstorming"
 
 
 def catch_errors(func):
@@ -93,55 +57,6 @@ def catch_errors(func):
             print("Caught error via decorator!", ex)
             logger.error(ex)
     return wrapper
-
-
-operations = {
-    Category.REDUCTIVE: {
-        Reductive.SUMMARIZATION: "Condenses long content into shorter form.",
-        Reductive.DISTILLATION: "Extracts core principles from complex information.",
-        Reductive.EXTRACTION: "Pulls out specific data like names or numbers.",
-        Reductive.CHARACTERIZING: "Identifies the nature or genre of the text."
-    },
-    Category.TRANSFORMATIONAL: {
-        Transformational.REFORMATTING: "Changes the presentation style of content.",
-        Transformational.REFACTORING: "Rewrites for better efficiency or clarity.",
-        Transformational.LANGUAGE_CHANGE: "Translates between natural or coding languages.",
-        Transformational.RESTRUCTURING: "Reorders content for logical flow.",
-        Transformational.MODIFICATION: "Alters tone, formality, or style.",
-        Transformational.CLARIFICATION: "Makes content clearer and more articulate."
-    },
-    Category.GENERATIVE: {
-        Generative.CONTENT_GENERATION: "Creating new text based on a given topic or seed phrase.",
-        Generative.QUESTION_GENERATION: "Creating questions based on a given text or context.",
-        Generative.CODE_GENERATION: "Writing code snippets or full programs based on user requirements.",
-        Generative.DIALOGUE_CREATION: "Generating conversational exchanges between characters or agents.",
-        Generative.SCENARIO_BUILDING: "Creating hypothetical situations or case studies.",
-        Generative.DATA_SIMULATION: "Generating synthetic data sets for testing or analysis.",
-        Generative.CREATIVE_WRITING: "Generating poems, songs, or other forms of creative text.",
-        Generative.INSTRUCTION_GENERATION: "Creating step-by-step guides or tutorials.",
-        Generative.PREDICTION: "Making forecasts based on given data or trends",
-        Generative.IDEA_BRAINSTORMING: "Generating a list of ideas or solutions for a given problem."
-    }
-}
-
-operations_map = {
-    Category.REDUCTIVE: list(map(lambda x: (x.value, operations[Category.REDUCTIVE][x]), Reductive)),
-    Category.TRANSFORMATIONAL: list(map(lambda x: (x.value, operations[Category.TRANSFORMATIONAL][x]), Transformational)),
-    Category.GENERATIVE: list(
-        map(lambda x: (x.value, operations[Category.GENERATIVE][x]), Generative))
-}
-
-
-def gen_taxonomy():
-    output = ""
-    for category, operations in operations_map.items():
-        output += (f"\nCategory: {category.value}\n")
-        for operation in operations:
-            output += (f" - {operation[0]}: {operation[1]}\n")
-    return output
-
-
-intro_prompt = f"You are a master logistician, linguist and teacher. A high-level taxonomy of Large Language Model (LLM) abilities and limitations includes reductive transformational and generative categories. Assuming each category is prefaced with 'Category:', and each subcategory is prefixed with ' - ', store the following:\n{gen_taxonomy()}\nThe prompt following this one will include a topic, category and subcategory so that you can elaborate on how to apply these to generate an enhanced prompt, based on the stored taxonomy. If the following prompt is a repeat of this prompt, ignore this prompt. If this is understood, please reply with 'understood'"
 
 
 class HagridErrorCode(Enum):
@@ -173,7 +88,7 @@ class FileContextManager():
 
 
 class GPTRequestContextManager():
-    def __init__(self, prompt=None, ui=None) -> None:
+    def __init__(self, prompt=None, ui=None, is_config=False) -> None:
         self._prompt = prompt
         self._api_key = os.getenv("OPENAI_API_KEY")
         if self._api_key == None:
@@ -185,6 +100,7 @@ class GPTRequestContextManager():
                 'No OPENAI_API_ORG env variable found', HagridErrorCode.INPUT_ERROR)
         self._req_url = 'https://api.openai.com/v1/chat/completions'
         self._ui = ui
+        self._is_config = is_config
 
     def __enter__(self):
         data = self.gen_request_data(self._prompt)
@@ -192,13 +108,13 @@ class GPTRequestContextManager():
         req = request.Request(self._req_url, data=data,
                               headers=headers, method='POST')
 
-        if self._prompt:
+        if self._is_config:
             self._ui.notify(
                 f"\033[94mSending request:\033[0m {self._prompt}\n")
         else:
             self._ui.notify(
                 "\033[95mSending GPT configuration request:\033[0m\n")
-            self._ui.notify(intro_prompt)
+            self._ui.notify(self._prompt)
             self._ui.notify()
 
         try:
@@ -218,9 +134,9 @@ class GPTRequestContextManager():
     def __exit__(self, cls, value, tb):
         pass
 
-    def gen_request_data(self, prompt=intro_prompt):
+    def gen_request_data(self, prompt):
         data = {
-            "model": "gpt-3.5-turbo",
+            "model": "gpt-4-0314",
             "messages": [{"role": "user", "content": f"{prompt}"}],
             "temperature": 0.7
         }
@@ -237,41 +153,46 @@ class GPTRequestContextManager():
 class UserInterface():
     """Command Line Interface where the user interacts with the application."""
 
-    def __init__(self) -> None:
-        self.categories = list(Category)
-        self.operations = operations.copy()
+    def __init__(self, taxonomy) -> None:
+        self.categories = list(taxonomy.keys())
+        self.taxonomy = taxonomy
 
-    def collect_prompt(self) -> tuple[str, Category, Reductive | Transformational | Generative]:
-        """Collects initial topic and prompt category from the user."""
-        topic = input("\033[94mPlease enter the initial topic: \033[0m")
-        print(f"Topic: {topic}")
-
+    def select_prompt(self, options, refined_taxonomy=None):
+        taxonomy = refined_taxonomy or self.taxonomy
         print("\n\033[94mPlease select a prompt category:\033[0m")
+        self.list_options(options)
+        choice = self.get_option(options)
+        selected_option = options[choice - 1]
+        subcategories = taxonomy[selected_option]
 
-        self.list_options(self.categories)
-
-        category_choice = self.get_option(self.categories)
-
-        operation_type = self.categories[category_choice - 1]
-        subcategories = self.operations[operation_type]
-
-        print(
-            f" - Prompt category: {operation_type.value}\n")
-
-        print(
-            f"\033[94mPlease select the subcategory:\n\033[0m")
-
-        self.list_options(subcategories, operation_type)
-
+        print(f" - Prompt category: {selected_option}\n")
+        print(f"\033[94mPlease select the subcategory:\n\033[0m")
+        self.list_options(subcategories, selected_option)
         subcategory_choice = list(subcategories)[
             self.get_option(subcategories) - 1]
-
+        print(f" - Prompt subcategory: {subcategory_choice}")
         print(
-            f" - Prompt subcategory: {subcategory_choice.value}")
-        print(
-            f" - Desc: {self.operations[operation_type][subcategory_choice]}\n")
+            f" - Desc: {taxonomy[selected_option][subcategory_choice]}\n")
 
-        return topic, operation_type.value, subcategory_choice.value
+        return selected_option, subcategory_choice
+
+    def collect_prompt(self):
+        topic = self.get_topic()
+        operation_type, subcategory_choice = self.select_prompt(
+            self.categories)
+        return topic, operation_type, subcategory_choice
+
+    def get_choices(self, refined_taxonomy):
+        ipdb.set_trace()
+        refined_categories = list(refined_taxonomy)
+        operation_type, subcategory_choice = self.select_prompt(
+            refined_categories, refined_taxonomy=refined_taxonomy)
+        return operation_type, subcategory_choice
+
+    def get_topic(self):
+        topic = input("\033[94mPlease enter the initial topic: \033[0m")
+        print(f"Topic: {topic}")
+        return topic
 
     def list_options(self, options: list[any], operation_type=None) -> None:
         for i, opt in enumerate(options):
@@ -281,24 +202,57 @@ class UserInterface():
 
     def get_option(self, options: list[any]) -> int:
         """Ensures user selection is in range of options param"""
-        option_choice = input("Your choice: ")
-        choice_number = None  # TODO: this var name is awful.
+        choice = input("Your choice: ")
+        option = None
 
         try:
-            choice_number = int(option_choice)
+            option = int(choice)
         except ValueError:
             print("Invalid choice. Please choose a valid integer")
             return self.get_option(options)
 
-        if choice_number not in range(1, len(options) + 1):
+        if option not in range(1, len(options) + 1):
             print(
                 f"Invalid choice. Please choose between {', '.join(map(str, list(range(1, len(options) + 1))))}")
             return self.get_option(options)
 
-        return choice_number
+        return option
 
     def notify(self, msg="\n"):
         print(msg)
+
+
+class FileParser():
+    def __init__(self) -> None:
+        with open('ex_res.txt') as file:
+            self.example_res = ''.join(file.readlines())
+
+        with open('og_prompt.txt') as file:
+            self.og_prompt = ''.join(file.readlines())
+
+        with open('reduce_list_prompt.txt') as file:
+            self.reduce_list_prompt = ''.join(file.readlines())
+
+        with open('taxonomy.txt') as file:
+            lines = file.readlines()
+            self.taxonomy = self.convert_taxonomy_text_to_dict(lines)
+            self.taxonomy_text = ''.join(lines)
+
+    def convert_taxonomy_text_to_dict(self, lines):
+        operations = {}
+        current_category = None
+
+        for line in lines:
+            line = line.strip()
+            if line.endswith(':'):
+                current_category = line[:-1]
+                operations[current_category] = {}
+            elif line.startswith('-'):
+                subcategory, description = line[1:].split(':', 1)
+                operations[current_category][subcategory.strip()
+                                             ] = description.strip()
+
+        return operations
 
 
 class LLMInterface():
@@ -306,15 +260,22 @@ class LLMInterface():
 
     def __init__(self):
         self.is_taxonomy_loaded = False
-        with FileContextManager('reduce_list_prompt.txt') as file:
-            self.reduce_list_prompt = ''.join(file.readlines())
 
-    def load_taxonomy(self, ui):
+    def load_taxonomy(self, ui, parser):
         try:
-            with GPTRequestContextManager(ui=ui, prompt=self.reduce_list_prompt) as result:
+            with GPTRequestContextManager(ui=ui, prompt=parser.reduce_list_prompt) as result:
+                print(result)
                 if result == "understood":
                     self.is_taxonomy_loaded = True
                 return result
+        except HagridError as ex:
+            raise HagridError(ex)
+
+    def refine_taxonomy(self, topic, ui):
+        try:
+            with GPTRequestContextManager(prompt=topic, ui=ui) as result:
+                print(result)
+                return self.decode_200_res(result)
         except HagridError as ex:
             raise HagridError(ex)
 
@@ -367,25 +328,34 @@ class DataStorage():
         self._con.commit()
 
 
-class Manager():
+class Mediator():
     """Acts as mediator between other modules"""
 
-    def __init__(self):
+    def __init__(self, parser):
         self.db = DataStorage()
         self.llm = LLMInterface()
-        self.ui = UserInterface()
+        self.ui = UserInterface(taxonomy=parser.taxonomy)
 
     def get_deps(self):
         return self.db, self.llm, self.ui
 
-    def init_gpt(self):
+    def init_gpt(self, parser):
         try:
-            return self.llm.load_taxonomy(self.ui)
+            return self.llm.load_taxonomy(self.ui, parser)
         except HagridError as ex:
             raise ex
 
     def get_initial_prompt(self):
         return self.ui.collect_prompt()
+
+    def get_topic(self):
+        return self.ui.get_topic()
+
+    def get_choices(self, refined_taxonomy):
+        return self.ui.get_choices(refined_taxonomy)
+
+    def refine_taxonomy(self, topic):
+        return self.llm.refine_taxonomy(topic, self.ui)
 
     def make_initial_request(self, initial_prompt):
         return self.llm.initial_request(initial_prompt, self.ui)
@@ -415,6 +385,7 @@ def get_args():
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--no_logs", action="store_true")
     parser.add_argument("--run-tests", action="store_true")
+    parser.add_argument("--one-shot", action="store_true")
     return parser.parse_args()
 
 
@@ -451,22 +422,32 @@ def config_logger(args):
 
 
 def main(args, logger):
-    logger.info("app initialised")
+    logger.info(f"app initialised with args: {args}")
 
     if args.debug == True:
         ipdb.set_trace(context=5)
 
-    app = Manager()
+    parser = FileParser()
+
+    app = Mediator(parser)
     db, llm, ui = app.get_deps()
     try:
         if args.skip == False:
-            res = app.init_gpt()
+            res = app.init_gpt(parser)
             if res:
                 s = 'Prompt taxonomy system loaded into GPT'
                 logger.info(s)
                 print(f"\033[95m{s}\033[0m\n")
 
-        topic, operation_type, subcategory_choice = app.get_initial_prompt()
+        if args.one_shot == True:
+            topic, operation_type, subcategory_choice = app.get_initial_prompt()
+        else:
+            topic = app.get_topic()
+            refined_taxonomy = app.refine_taxonomy(topic)
+            new_taxonomy = parser.convert_taxonomy_text_to_dict(
+                refined_taxonomy)
+            operation_type, subcategory_choice = app.get_choices(new_taxonomy)
+
         enhanced_prompt = app.make_initial_request(
             (topic, operation_type, subcategory_choice))
         enhanced_res = app.make_enhanced_request(enhanced_prompt)

@@ -1,0 +1,25 @@
+Reductive Operations:
+- Summarization: Condenses long content into shorter form.
+- Distillation: Extracts core principles from complex information.
+- Extraction: Pulls out specific data like names or numbers.
+- Characterizing: Identifies the nature or genre of the text.
+
+Transformational Operations:
+- Reformatting: Changes the presentation style of content.
+- Refactoring: Rewrites for better efficiency or clarity.
+- Language Change: Translates between natural or coding languages.
+- Restructuring: Reorders content for logical flow.
+- Modification: Alters tone, formality, or style.
+- Clarification: Makes content clearer and more articulate.
+
+Generative Operations:
+- Content Generation: Creating new text based on a given topic or seed phrase.
+- Question Generation: Creating questions based on a given text or context.
+- Code Generation: Writing code snippets or full programs based on user requirements.
+- Dialogue Creation: Generating conversational exchanges between characters or agents.
+- Scenario Building: Creating hypothetical situations or case studies.
+- Data Simulation: Generating synthetic data sets for testing or analysis.
+- Creative Writing: Generating poems, songs, or other forms of creative text.
+- Instruction Generation: Creating step-by-step guides or tutorials.
+- Prediction: Making forecasts based on given data or trends.
+- Idea Brainstorming: Generating a list of ideas or solutions for a given problem.

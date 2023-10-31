@@ -8,8 +8,8 @@
       "name": "Python: Current File",
       "type": "python",
       "request": "launch",
-      "program": "contemplate_koans.py",
-      "cwd": "src/koans",
+      "program": "/Users/rick.hallett/code/personal/nagini/src/hagrid/app/core.py",
+      "cwd": "/Users/rick.hallett/code/personal/nagini/src/hagrid/app/",
       "console": "integratedTerminal",
       "justMyCode": true
     }

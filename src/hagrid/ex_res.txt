@@ -1,0 +1,13 @@
+Category: Reductive Operations
+ - Summarization: Condenses long content into shorter form.
+ - Distillation: Extracts core principles from complex information.
+
+Category: Transformational Operations
+ - Reformatting: Changes the presentation style of content.
+ - Refactoring: Rewrites for better efficiency or clarity.
+ - Clarification: Makes content clearer and more articulate.
+
+Category: Generative Operations
+ - Content Generation: Creating new text based on a given topic or seed phrase.
+ - Instruction Generation: Creating step-by-step guides or tutorials.
+ - Idea Brainstorming: Generating a list of ideas or solutions for a given problem.

@@ -1,22 +1,3 @@
-"""
-### Multidimensional Skills:
-1. **Technical Mastery**: Proficiency in programming languages, understanding of algorithms and data structures.
-2. **Architectural Insight**: Skills in system design, knowledge of design patterns, and architectural best practices.
-3. **Problem-Solving Wizardry**: Ability to troubleshoot, debug, and find creative solutions to complex problems.
-4. **Enchanted Communication**: Clarity in code documentation, effective communication skills, ability to articulate technical concepts.
-5. **Potions (Tools & Technologies)**: Familiarity with various tools, frameworks, and emerging technologies.
-6. **Divination (Future Readiness)**: Keeping up with industry trends, learning new technologies, and adapting to changes.
-7. **Arcane Collaboration**: Teamwork skills, ability to work effectively in diverse teams, conflict resolution.
-8. **Transfiguration**: Leadership qualities, ability to mentor and guide others, project management skills.
-9. **Charms of Influence**: Networking skills, ability to influence and persuade, public speaking and presentation skills.
-10. **Legilimency**: Emotional intelligence, ability to understand and respond to the needs of team members and stakeholders.
-11. **Defense Against the Dark Arts (Security & Ethics)**: Knowledge of security best practices, ethical considerations in coding and technology.
-
-### Advancement and Recognition:
-- Coders can advance in each dimension independently, allowing them to focus on areas of interest or strength.
-- Recognition can be given for achievements in specific dimensions, not just overall coding prowess.
-"""
-
 from queue import Queue
 from enum import Enum, auto
 
@@ -199,6 +180,5 @@ hogwarts.update_dimension(
 
 hogwarts.determine_ascension("Harry")
 hogwarts.determine_ascension("Dumbledore")
-
 
 print(hogwarts)

@@ -1,5 +1,8 @@
 from queue import Queue
 from enum import Enum, auto
+from dataclasses import dataclass
+
+from flask import Flask, request, jsonify
 
 
 class WizardRank(Enum):
@@ -45,6 +48,7 @@ class Dimension(Enum):
     DEFENSE_AGAINST_THE_DARK_ARTS = auto()
 
 
+@dataclass
 class Hogwarts:
     def __init__(self):
         self.wizards = []
@@ -108,6 +112,7 @@ class Hogwarts:
         return f"\nHogwarts Wizards: {[wizard.pretty_print() for wizard in self.wizards]}"
 
 
+@dataclass
 class Wizard:
     def __init__(self, name):
         self.name = name
@@ -144,41 +149,89 @@ class Wizard:
         return self.name
 
 
+app = Flask(__name__)
+
 hogwarts = Hogwarts()
 
-harry = Wizard("Harry")
-dumbledore = Wizard("Dumbledore")
 
-hogwarts.register_wizard(harry)
-hogwarts.register_wizard(dumbledore)
-hogwarts.process_registrations()
+@app.route('/', methods=["GET"])
+def index():
+    return '<h1>Welcome to Hogwarts. May you live in interesting times</h1>'
 
-hogwarts.update_dimension("Harry", Dimension.TECHNICAL_MASTERY, 4)
-hogwarts.update_dimension("Harry", Dimension.ARCHITECTURAL_INSIGHT, 3)
-hogwarts.update_dimension("Harry", Dimension.PROBLEM_SOLVING_WIZARDRY, 4)
-hogwarts.update_dimension("Harry", Dimension.ENCHANTED_COMMUNICATION, 4)
-hogwarts.update_dimension("Harry", Dimension.POTIONS, 4)
-hogwarts.update_dimension("Harry", Dimension.DIVINATION, 5)
-hogwarts.update_dimension("Harry", Dimension.ARCANE_COLLABORATION, 6)
-hogwarts.update_dimension("Harry", Dimension.TRANSFIGURATION, 5)
-hogwarts.update_dimension("Harry", Dimension.CHARMS_OF_INFLUENCE, 6)
-hogwarts.update_dimension("Harry", Dimension.LEGILIMENCY, 7)
-hogwarts.update_dimension("Harry", Dimension.DEFENSE_AGAINST_THE_DARK_ARTS, 1)
 
-hogwarts.update_dimension("Dumbledore", Dimension.TECHNICAL_MASTERY, 9)
-hogwarts.update_dimension("Dumbledore", Dimension.ARCHITECTURAL_INSIGHT, 8)
-hogwarts.update_dimension("Dumbledore", Dimension.PROBLEM_SOLVING_WIZARDRY, 8)
-hogwarts.update_dimension("Dumbledore", Dimension.ENCHANTED_COMMUNICATION, 9)
-hogwarts.update_dimension("Dumbledore", Dimension.POTIONS, 8)
-hogwarts.update_dimension("Dumbledore", Dimension.DIVINATION, 8)
-hogwarts.update_dimension("Dumbledore", Dimension.ARCANE_COLLABORATION, 8)
-hogwarts.update_dimension("Dumbledore", Dimension.TRANSFIGURATION, 8)
-hogwarts.update_dimension("Dumbledore", Dimension.CHARMS_OF_INFLUENCE, 9)
-hogwarts.update_dimension("Dumbledore", Dimension.LEGILIMENCY, 8)
-hogwarts.update_dimension(
-    "Dumbledore", Dimension.DEFENSE_AGAINST_THE_DARK_ARTS, 7)
+@app.route("/register_wizard", methods=["POST"])
+def add_wizard():
+    data = request.json
+    name = data.get("name")
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    wizard = Wizard(name)
+    hogwarts.register_wizard(wizard)
+    print(hogwarts)
+    return jsonify({"message": f"{name} has been added to Hogwarts!"})
 
-hogwarts.determine_ascension("Harry")
-hogwarts.determine_ascension("Dumbledore")
 
-print(hogwarts)
+@app.route('/process_registrations', methods=["GET"])
+def process_registrations():
+    hogwarts.process_registrations()
+    return jsonify(hogwarts)
+
+
+@app.route("/change_rank", methods=["PUT"])
+def change_rank():
+    data = request.json
+    name = data.get("name")
+    rank = data.get("rank")
+    if not name or not rank:
+        return jsonify({"error": "Both name and rank are required"}), 400
+    try:
+        new_rank = WizardRank[rank.upper()]
+        hogwarts.update_rank(name, new_rank)
+        return jsonify({"message": f"{name}'s rank has been updated to {new_rank.name}!"})
+    except KeyError:
+        return jsonify({"error": "Invalid rank provided"}), 400
+
+
+@app.route("/wizards", methods=["GET"])
+def get_wizards():
+    wizards_list = [{"name": wizard.name, "rank": wizard.rank.name,
+                     "dimensions": wizard.dimensions} for wizard in hogwarts.wizards]
+    return jsonify({"wizards": wizards_list})
+
+
+@app.route('/init', methods=["GET"])
+def init():
+    hogwarts.update_dimension("Harry", Dimension.TECHNICAL_MASTERY, 4)
+    hogwarts.update_dimension("Harry", Dimension.ARCHITECTURAL_INSIGHT, 3)
+    hogwarts.update_dimension("Harry", Dimension.PROBLEM_SOLVING_WIZARDRY, 4)
+    hogwarts.update_dimension("Harry", Dimension.ENCHANTED_COMMUNICATION, 4)
+    hogwarts.update_dimension("Harry", Dimension.POTIONS, 4)
+    hogwarts.update_dimension("Harry", Dimension.DIVINATION, 5)
+    hogwarts.update_dimension("Harry", Dimension.ARCANE_COLLABORATION, 6)
+    hogwarts.update_dimension("Harry", Dimension.TRANSFIGURATION, 5)
+    hogwarts.update_dimension("Harry", Dimension.CHARMS_OF_INFLUENCE, 6)
+    hogwarts.update_dimension("Harry", Dimension.LEGILIMENCY, 7)
+    hogwarts.update_dimension(
+        "Harry", Dimension.DEFENSE_AGAINST_THE_DARK_ARTS, 1)
+
+    hogwarts.update_dimension("Dumbledore", Dimension.TECHNICAL_MASTERY, 9)
+    hogwarts.update_dimension("Dumbledore", Dimension.ARCHITECTURAL_INSIGHT, 8)
+    hogwarts.update_dimension(
+        "Dumbledore", Dimension.PROBLEM_SOLVING_WIZARDRY, 8)
+    hogwarts.update_dimension(
+        "Dumbledore", Dimension.ENCHANTED_COMMUNICATION, 9)
+    hogwarts.update_dimension("Dumbledore", Dimension.POTIONS, 8)
+    hogwarts.update_dimension("Dumbledore", Dimension.DIVINATION, 8)
+    hogwarts.update_dimension("Dumbledore", Dimension.ARCANE_COLLABORATION, 8)
+    hogwarts.update_dimension("Dumbledore", Dimension.TRANSFIGURATION, 8)
+    hogwarts.update_dimension("Dumbledore", Dimension.CHARMS_OF_INFLUENCE, 9)
+    hogwarts.update_dimension("Dumbledore", Dimension.LEGILIMENCY, 8)
+    hogwarts.update_dimension(
+        "Dumbledore", Dimension.DEFENSE_AGAINST_THE_DARK_ARTS, 7)
+
+    hogwarts.determine_ascension("Harry")
+    hogwarts.determine_ascension("Dumbledore")
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

@@ -1,0 +1,6 @@
+INFO - info message
+WARNING - warning message
+ERROR - error message
+CRITICAL - critical message
+CRITICAL - On Tuesday, I'm taking my dog to Central Park.
+CRITICAL - On Saturday, I'm taking my cat to the lake.
